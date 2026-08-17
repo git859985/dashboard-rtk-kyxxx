@@ -1,0 +1,569 @@
+
+
+<!DOCTYPE html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2026 by anonymous (http://jsbin.com/xonenuteze/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>康鷹空間資訊 RTK 控制面板</title>
+    <script>
+        function checkPassword() {
+            var correctPassword = "23205238"; // 你的正確密碼        
+            while (true) {
+                var password = prompt("請輸入密碼：");        
+                // 1. 檢查是否答對了：答對就立刻打破(break)迴圈，放行！
+                if (password === correctPassword) {
+                    break; //
+                }        
+                // 2. 如果沒答對，檢查是不是「取消」或「空白」
+                if (password === null || password === "") {
+                    continue; //重頭開始
+                }
+                alert("密碼錯誤！");
+            }
+        }
+
+        //checkPassword();
+    </script>    
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+        /* 針對手機優化的全域設定 */
+        body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 10px; margin: 0; box-sizing: border-box; }
+        * { box-sizing: border-box; }
+
+        /* 模擬經典 VB 視窗外框 (改為寬度自適應手機螢幕) */
+        .window { background: #e0e0e0; border: 2px solid #fff; border-right: 2px solid #808080; border-bottom: 2px solid #808080; width: 100%; max-width: 500px; margin: 0 auto; padding: 15px; box-shadow: 3px 3px 10px rgba(0,0,0,0.2); }
+        
+        /* 模擬 VB 藍色標題列 */
+        .title-bar { background-image: linear-gradient(to right, #000080, #1084d0); color: white; padding: 6px 10px; font-weight: bold; margin: -15px -15px 15px -15px; font-size: 14px; }
+        
+        /* 內嵌區塊 */
+        .group { border: 1px solid #808080; padding: 12px; margin-bottom: 15px; background: #fff; position: relative; margin-top: 15px; }
+        .group-title { position: absolute; top: -10px; left: 10px; background: #fff; padding: 0 5px; font-size: 12px; font-weight: bold; color: #333; }
+        
+        /* 手機版上下排版：標籤在上，輸入框在下，手指才好按 */
+        .field { margin-bottom: 12px; display: flex; flex-direction: column; align-items: flex-start; }
+        .field:last-child { margin-bottom: 0; }
+        
+        label { font-size: 13px; font-weight: bold; color: #444; margin-bottom: 4px; }
+        
+        /* 放大輸入框，方便手機操作 */
+        input[type="text"] { width: 100%; padding: 8px; border: 1px solid #808080; font-size: 15px; background-color: #fff; -webkit-appearance: none; border-radius: 0; }
+        
+        /* 模擬 VB 灰色立體按鈕 (放大高度與字體) */
+        button { padding: 12px 20px; background: #e0e0e0; border: 2px solid #fff; border-right: 2px solid #808080; border-bottom: 2px solid #808080; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%; margin-top: 10px; -webkit-appearance: none; }
+        button:active { border: 2px solid #808080; border-right: 2px solid #fff; border-bottom: 2px solid #fff; background: #d5d5d5; }
+        button.selected { 
+            border: 2px solid #808080 !important; 
+            border-right: 2px solid #fff !important; 
+            border-bottom: 2px solid #fff !important; 
+            background: #d5d5d5 !important; 
+            /*color: red !important;*/ /* 文字變紅色 */
+        }
+        #status { font-weight: bold; color: red; }
+        /* 狀態數值樣式 */
+        .val { width: 100%; font-weight: bold; color: blue; font-size: 16px; padding: 4px 0; }
+      
+        /* 針對您 class="group" 裡面的 table 按鈕進行設定 */
+        .group table button {width: 100%; box-sizing: border-box; white-space: nowrap; }
+    
+    </style>
+</head>
+<body>
+
+<div class="window">
+    <div class="title-bar">RTK 控制面板 (KY004)</div>
+    <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; white-space: nowrap;">
+        <div style="flex: 1; text-align: left;">
+            連線狀態: <span id="status">正在連線至 MQTTGO...</span>
+        </div>
+        <div style="flex: 1; text-align: left;">
+            運行時間: <span id="rtk_uptime" class="val"></span>
+        </div>
+        <div style="flex: 1; text-align: left;">
+            溫度: <span id="rtk_tempC" class="val"></span>
+        </div>      
+    </div> 
+
+    <div class="group">
+        <div class="group-title">NMEA即時狀態(5秒更新)</div>
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">定位狀態:</label>
+            <span id="rtk_sol" class="val" style="width: auto; text-align: right;"></span>
+        </div>
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">緯度 (Lat):</label>
+            <span id="rtk_lat" class="val" style="width: auto; text-align: right;"></span>
+        </div>
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">經度 (Lon):</label>
+            <span id="rtk_lon" class="val" style="width: auto; text-align: right;"></span>
+        </div>
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">橢球高 (Ellipsoid):</label>
+            <span id="rtk_ell" class="val" style="width: auto; text-align: right;"></span>
+        </div>     
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">海拔高 (Altitude):</label>
+            <span id="rtk_alt" class="val" style="width: auto; text-align: right;"></span>
+        </div>
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">地面高 (Geoid):</label>
+            <span id="rtk_geo" class="val" style="width: auto; text-align: right;"></span>
+        </div>      
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">時間 (UTC+8):</label>
+            <span id="rtk_time" class="val" style="width: auto; text-align: right;"></span>
+        </div>
+    </div>
+
+  
+  
+    <div class="group">
+     <div class="group-title">連線模式</div>
+        <table width="100%" border="0">
+            <tr>
+                <td width="30%" align="center"><button id="btn_idle" onclick="send_idle()">離線</button></td>
+                <td width="30%" align="center"><button id="btn_rover" onclick="send_rover()">移動站</button></td>
+                <td width="30%" align="center"><button id="btn_base" onclick="send_base()">基站</button></td>                 
+            </tr>
+        </table>
+    </div>  
+  
+  
+    <div class="group">
+      <div class="group-title">基站座標</div>
+      <div class="field">
+        <label>緯度 (Latitude):</label>
+        <input type="text" id="base_lat" value="">
+      </div>
+      
+      <div class="field">
+        <label>經度 (Longitude):</label>
+        <input type="text" id="base_lon" value="">
+      </div>
+      
+      <div class="field">
+        <label>高度 (Height):</label>
+        <input type="text" id="base_ell" value="">
+      </div>
+     
+      <table width="100%" border="0">
+        <tr>
+          <td width="30%" align="center"><button onclick="loadBase()">讀取座標</button></td>
+          <td width="30%" align="center"><button onclick="sendBase()">設為基站</button></td>
+        </tr>
+      </table> 
+    </div>
+  
+    <div class="group">
+        <div class="group-title"></div>
+     
+      <button onclick="sendRover()">設為移動站</button>
+      
+     </div>
+  
+    <div class="group">
+        <div class="group-title">NTRIP 伺服器設定</div>
+        <div class="field">
+            <label>IP / 網址:</label>
+            <input type="text" id="ntrip_ip" value="">
+        </div>
+        <div class="field">
+            <label>連接埠 (Port):</label>
+            <input type="text" id="ntrip_port" value="">
+        </div>
+        <div class="field">
+            <label>掛載點 (Mount):</label>
+            <input type="text" id="ntrip_mount" value="">
+        </div>
+        <div class="field">
+            <label>基站名稱:</label>
+            <input type="text" id="base_mount" value="">
+        </div> 
+      
+        <div class="field">
+            <label>User:</label>
+            <input type="text" id="ntrip_user" value="">
+        </div>
+        <div class="field">
+            <label>Password:</label>
+            <input type="text" id="ntrip_pass" value="">
+        </div>       
+    <table width="100%" border="0">
+        <tr>
+            <td width="50%" align="center"><button onclick="loadConfig()">讀取設定</button></td>
+            <td width="50%" align="center"><button onclick="sendConfig()">修改送出</button></td>
+        </tr>
+    </table>
+      
+    </div>
+      <div class="group">
+        <div class="group-title">自訂內容發送</div>
+        <div class="field">
+            <input type="text" id="Text1" value="saveconfig">
+        </div>     
+      <button onclick="sendButton1()">送出</button>
+     </div>    
+  </div>
+<script>
+    var workmode = "idle";
+    var latDD = 0.0;
+    var latDMS ="";
+    var lonDD = 0.0;
+    var lonDMS = "";
+    var ellipsoid = 0.0;
+    var geoid = 0.0;
+    // ═══════════════ MQTTGO 伺服器與 Topic 設定 ═══════════════
+    const host = 'wss://mqttgo.vip:8084/mqtt'; 
+    const myTopic = '/user/rock859985/RTK/KY004/cmd'; // 網頁發佈(傳送)給 ESP32 的主題
+    const reportTopic1 = '/user/rock859985/RTK/KY004/nmea'; // 網頁訂閱(接收) ESP32 狀態的主題
+    const reportTopic2 = '/user/rock859985/RTK/KY004/log'; // 網頁訂閱(接收) ESP32 狀態的主題
+
+    // MQTT 連線參數設定
+    const options = {
+        connectTimeout: 4000,
+        clientId: 'KY' + Math.random().toString(16).substr(2, 8),
+        username: 'rock859985', 
+        password: 'Kb9waBiV9ZV3', 
+    };
+
+    console.log('正在連線至 MQTTGO...');
+    const client = mqtt.connect(host, options);
+
+    client.on('connect', () => {
+        document.getElementById('status').innerText = '連線成功';
+        document.getElementById('status').style.color = 'green';
+        client.subscribe(reportTopic1);
+        client.subscribe(reportTopic2);
+    });
+
+    client.on('error', (err) => {
+        document.getElementById('status').innerText = '連線失敗';
+        document.getElementById('status').style.color = 'red';
+    });  
+    
+    client.on('message', (topic, message) => {
+        const msgString = message.toString();
+        
+        if (topic === reportTopic1) {
+            try {
+                // 將收到的純文字嘗試解析為 JSON 物件
+                const data = JSON.parse(msgString);
+
+
+                
+                if (data.Status) {
+                    workmode = data.Status;
+                    // 1. 直接用 id 移除選中樣式（乾淨、不用 var 宣告）
+                    btn_idle.classList.remove("selected");
+                    btn_rover.classList.remove("selected");
+                    btn_base.classList.remove("selected");
+                    if (workmode === "idle") btn_idle.classList.add("selected");
+                    else if (workmode === "rover") btn_rover.classList.add("selected");
+                    else if (workmode === "base") btn_base.classList.add("selected");
+                }
+
+                if (data.FixType && data.FixType !== "") {
+                    // 1. 強制把資料轉成字串，防範數字型態，並統一轉大寫防範大小寫問題
+                    const fixStr = String(data.FixType).toUpperCase();
+                    const solElement = document.getElementById('rtk_sol');
+                    
+                    solElement.textContent = data.FixType; // 換成你最喜歡的 textContent
+                
+                    // 根據解算狀態動態變更顏色 (FIX 變綠色，FLOAT/其他變藍色，新增不定位 INVALID 變紅色)
+                    if (fixStr.includes("FIX") || fixStr.includes("4")) {
+                        solElement.style.color = "green";   // RTK 定位成功
+                    } else if (fixStr.includes("FLOAT") || fixStr.includes("5") || fixStr.includes("2")) {
+                        solElement.style.color = "blue";    // 浮點解
+                    } else {
+                        solElement.style.color = "red";     // 未定位或無效解
+                    }
+                } else {
+                    solElement.textContent = "--";
+                    solElement.style.color = "red";
+                }
+                
+                // 2. 填入十進位經緯度 (改用 textContent)
+                /*if (data.LatDeg && data.LatDMS) {
+                    document.getElementById('rtk_lat').textContent = `${data.LatDeg} / ${data.LatDMS}`;
+                }
+                if (data.LonDeg && data.LonDMS) {
+                    document.getElementById('rtk_lon').textContent = `${data.LonDeg} / ${data.LonDMS}`;
+                }*/
+                
+                if (data.RawLat) {
+                    latDD = nmeaToDD(data.RawLat).toFixed(8); 
+                    latDMS = nmeaToDMS(data.RawLat);
+                    document.getElementById('rtk_lat').textContent = latDD + " / " + latDMS;              
+                } else {
+                    document.getElementById('rtk_lat').textContent = "--";
+                }
+                
+                if (data.RawLon) {
+                    lonDD = nmeaToDD(data.RawLon).toFixed(8); 
+                    lonDMS = nmeaToDMS(data.RawLon);
+                    document.getElementById('rtk_lon').textContent = lonDD + " / " + lonDMS;              
+                } else {
+                    document.getElementById('rtk_lon').textContent = "--";
+                }           
+                          
+                // 3. 【高能注意】海拔高度可能是 0 米！用簡寫會失效，所以必須用這種寫法來防呆：
+                if (data.Ellipsoid !== undefined && data.Ellipsoid !== null) {
+                //if (data.Ellipsoid && data.Ellipsoid !== "") {
+                    document.getElementById('rtk_ell').textContent = data.Ellipsoid + " m";
+                    ellipsoid = data.Ellipsoid;
+                } else {
+                    document.getElementById('rtk_ell').textContent = "--";
+                } 
+                //if (data.Alt !== undefined && data.Alt !== null) {
+                if (data.Alt && data.Alt !== "") {
+                    document.getElementById('rtk_alt').textContent = data.Alt + " m";
+                } else {
+                    document.getElementById('rtk_alt').textContent = "--";
+                } 
+                //if (data.Geo !== undefined && data.Geo !== null) {
+                if (data.Geo && data.Geo !== "") {
+                    document.getElementById('rtk_geo').textContent = data.Geo + " m";
+                    geoid = data.Geo; // 順便幫你把複製錯誤的註解修正了
+                } else {
+                    document.getElementById('rtk_geo').textContent = "--";
+                } 
+                
+                // 4. 填入 UTC 時間
+                if (data.UTC) {
+                    const utcStr = String(data.UTC).trim();
+                    
+                    if (utcStr.length === 6) {
+                        let hh = parseInt(utcStr.substring(0, 2), 10);
+                        const mm = utcStr.substring(2, 4);
+                        const ss = utcStr.substring(4, 6);
+                        
+                        // 轉換為台灣時間 (UTC + 8)
+                        hh = (hh + 8) % 24;
+                        
+                        // 補零確保維持兩位數
+                        const twHH = String(hh).padStart(2, '0');
+                        
+                        // 顯示台灣本地時間
+                        document.getElementById('rtk_time').textContent = `${twHH}:${mm}:${ss}`;
+                    } else {
+                        document.getElementById('rtk_time').textContent = utcStr;
+                    }
+                }               
+                //5. ESP運行時間
+                if (data.Uptime !== undefined && data.Uptime !== null) {
+                    const totalSeconds = Math.floor(data.Uptime);
+                    
+                    // 拆出天、時、分、秒
+                    const days = Math.floor(totalSeconds / 86400); // 1天 = 86400秒
+                    const hours = Math.floor((totalSeconds % 86400) / 3600);
+                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                    const seconds = totalSeconds % 60;
+                
+                    const h = String(hours).padStart(2, '0');
+                    const m = String(minutes).padStart(2, '0');
+                    const s = String(seconds).padStart(2, '0');
+                
+                    // 如果滿 1 天以上才顯示天數，否則只顯示時間
+                    if (days > 0) {
+                        document.getElementById('rtk_uptime').textContent = `${days}d ${h}:${m}:${s}`;
+                    } else {
+                        document.getElementById('rtk_uptime').textContent = `${h}:${m}:${s}`;
+                    }
+                }
+                //6. LM35D溫度
+                if (data.TempC !== null) {
+                    //document.getElementById('rtk_tempC').textContent = data.TempC
+                  document.getElementById('rtk_tempC').textContent = Number(data.TempC).toFixed(1);
+
+                }                 
+                
+            } catch (e) {
+                console.warn("非JSON數據，已自動忽略。");
+            }
+
+                       
+        }
+      
+        else if (topic === reportTopic2) {
+            try {
+                // 將收到的純文字嘗試解析為 JSON 物件
+                const data = JSON.parse(msgString); 
+                // 全部統一用簡寫，既乾淨又好讀
+                if (data.host)       document.getElementById('ntrip_ip').value = data.host;
+                if (data.port)       document.getElementById('ntrip_port').value = data.port;
+                if (data.mount)      document.getElementById('ntrip_mount').value = data.mount;
+                if (data.user)       document.getElementById('ntrip_user').value = data.user;
+                if (data.pw)         document.getElementById('ntrip_pass').value = data.pw;
+                if (data.base_mount) document.getElementById('base_mount').value = data.base_mount;                
+            } catch (e) {
+                console.warn("非JSON數據，已自動忽略。");
+            }
+        }      
+    });
+ 
+    function send_idle() {
+            client.publish(myTopic, "{\"mode\":\"idle\"}", { qos: 1 });      
+    }
+    
+    function send_rover() {     
+        if (workmode !== "idle") {
+            alert("請先離線再操作！");
+        }
+        else {
+            client.publish(myTopic, "{\"mode\":\"rover\"}", { qos: 1 });
+        }         
+    }
+    
+    function send_base() {
+        if (workmode !== "idle") {
+            alert("請先離線再操作！");
+        }
+        else {
+            client.publish(myTopic, "{\"mode\":\"base\"}", { qos: 1 });
+        }         
+    }  
+  
+/*  function sendConfig() {
+        const config = {
+            host: document.getElementById('ntrip_ip').value,
+            port: parseInt(document.getElementById('ntrip_port').value),
+            mount: document.getElementById('ntrip_mount').value,
+            base_mount: document.getElementById('base_mount').value,
+            user: document.getElementById('ntrip_user').value,
+            pw: document.getElementById('ntrip_pass').value          
+        };
+*/
+function sendConfig() {
+    if (workmode !== "idle") {
+        alert("請先離線再操作！");
+    }
+    else {
+        const config = {
+            host: document.getElementById('ntrip_ip').value.trim(), // 建議加上 .trim()
+            port: document.getElementById('ntrip_port').value.trim(), // 先別 parseInt，當字串檢查
+            mount: document.getElementById('ntrip_mount').value.trim(),
+            base_mount: document.getElementById('base_mount').value.trim(),
+            user: document.getElementById('ntrip_user').value.trim(),
+            pw: document.getElementById('ntrip_pass').value.trim()      
+        };
+    
+        // 只要這段「攔截檢查」寫在 publish 之前，就能成功擋下
+        const hasEmptyField = Object.values(config).some(value => value === "");
+        if (hasEmptyField) {
+            alert("所有欄位都要填！");
+            return; // 在這裡被擋住，下面的 publish 就讀不到，自然送不出去了
+        }   
+        config.port = parseInt(config.port, 10);    
+        const jsonString = JSON.stringify(config);        
+        client.publish(myTopic, jsonString, { qos: 1 });
+    }  
+}
+    
+    function loadConfig() {
+        if (workmode !== "idle") {
+            alert("請先離線再操作！");
+        }
+        else {
+            client.publish(myTopic, "AT+CONFIG?", { qos: 1 });
+        }        
+        
+    }
+
+    function loadBase() {
+        document.getElementById('base_lat').value = latDD;
+        document.getElementById('base_lon').value = lonDD;
+        document.getElementById('base_ell').value = ellipsoid;
+    }    
+
+    function sendBase() {
+        if (workmode !== "idle") {
+            alert("請先離線再操作！");
+        }
+        else {
+            // 1. 先把輸入框的原始文字抓出來（先不急著轉數字，不然一轉成數字，空的就會變 NaN）
+            const raw_lat = document.getElementById('base_lat').value.trim();
+            const raw_lon = document.getElementById('base_lon').value.trim();
+            const raw_ell = document.getElementById('base_ell').value.trim();
+    
+            var target_lat = "";
+            var target_lon = "";
+            var target_alt = "";
+    
+            if (raw_lat !== "" && raw_lon !== "" && raw_ell !== "") {      
+                target_lat = " " + raw_lat;
+                target_lon = " " + raw_lon;
+                const calculated_alt = parseFloat(raw_ell) - geoid; // 正常做減法運算
+                target_alt = " " + calculated_alt.toFixed(4);
+            }   
+            const base_buf = "MODE BASE" + target_lat + target_lon + target_alt;
+            client.publish(myTopic, base_buf, { qos: 1 }); 
+        } 
+    }
+
+  
+    function sendRover() {
+        if (workmode !== "idle") {
+            alert("請先離線再操作！");
+        }
+        else {client.publish(myTopic, "MODE ROVER", { qos: 1 });
+        }        
+    }
+    
+    function sendButton1() {
+        if (workmode !== "idle") {
+            alert("請先離線再操作！");
+        }
+        else {
+            // 抓取對應輸入框的純文字內容
+            const rawText = document.getElementById('Text1').value;
+            // 直接把這串純文字 Publish 出去，完全不包裝 JSON
+            client.publish(myTopic, rawText, { qos: 1 });
+        }
+    }
+    
+// 1. 將 NMEA 原始座標轉成十進位度數 (DD.DDDDDD)
+    function nmeaToDD(rawValue) {
+        if (!rawValue || isNaN(rawValue)) return 0;
+        
+        // NMEA 格式為 DDMM.MMMM，所以除以 100 取整數就是「度」
+        const degrees = Math.floor(rawValue / 100);
+        // 扣掉度，剩下的就是「分」
+        const minutes = rawValue - (degrees * 100);
+        
+        // 分除以 60 換算成度，加起來
+        return degrees + (minutes / 60);
+    }
+    
+    // 2. 將 NMEA 原始座標轉成度分秒字串 (D°M'S")
+    function nmeaToDMS(rawValue) {
+        if (!rawValue || isNaN(rawValue)) return "";
+    
+        const d = Math.floor(rawValue / 100);
+        const rawMinutes = rawValue - (d * 100);
+        const m = Math.floor(rawMinutes);
+        
+        // 算秒數，並用 .toFixed(4) 限制小數點後 4 位（對齊你 C++ 的 %.4f）
+        const s = ((rawMinutes - m) * 60).toFixed(4);
+        
+        // 使用 padStart 幫分鐘補零（例如 5 分變成 05 分）
+        const mStr = String(m).padStart(2, '0');
+    
+        // 網頁端可以直接打出 ° 這個符號，不需要寫 \xC2\xB0 了！
+        return `${d}°${mStr}'${s}"`;
+    }      
+
+</script>
+</body>
+</html>
