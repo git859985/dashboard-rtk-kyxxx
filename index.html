@@ -82,7 +82,7 @@ Released under the MIT license: http://jsbin.mit-license.org
 <body>
 
 <div class="window">
-    <div class="title-bar">RTK 控制面板 (KY004)</div>
+    <div class="title-bar">RTK 控制面板 (KYD1BD58)</div>
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; white-space: nowrap;">
         <div style="flex: 1; text-align: left;">
             連線狀態: <span id="status">正在連線至 MQTTGO...</span>
@@ -226,9 +226,9 @@ Released under the MIT license: http://jsbin.mit-license.org
     var geoid = 0.0;
     // ═══════════════ MQTTGO 伺服器與 Topic 設定 ═══════════════
     const host = 'wss://mqttgo.vip:8084/mqtt'; 
-    const myTopic = '/user/rock859985/RTK/KY004/cmd'; // 網頁發佈(傳送)給 ESP32 的主題
-    const reportTopic1 = '/user/rock859985/RTK/KY004/nmea'; // 網頁訂閱(接收) ESP32 狀態的主題
-    const reportTopic2 = '/user/rock859985/RTK/KY004/log'; // 網頁訂閱(接收) ESP32 狀態的主題
+    const myTopic = '/user/rock859985/RTK/KYD1BD58/cmd'; // 網頁發佈(傳送)給 ESP32 的主題
+    const reportTopic1 = '/user/rock859985/RTK/KYD1BD58/nmea'; // 網頁訂閱(接收) ESP32 狀態的主題
+    const reportTopic2 = '/user/rock859985/RTK/KYD1BD58/log'; // 網頁訂閱(接收) ESP32 狀態的主題
 
     // MQTT 連線參數設定
     const options = {
