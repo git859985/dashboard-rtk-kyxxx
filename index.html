@@ -125,6 +125,11 @@ Released under the MIT license: http://jsbin.mit-license.org
             <label style="margin-bottom: 0;">時間 (UTC+8):</label>
             <span id="rtk_time" class="val" style="width: auto; text-align: right;"></span>
         </div>
+        
+        <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">Log:</label>
+            <span id="rtk_log" class="val" style="width: auto; text-align: right;"></span>
+        </div>        
     </div>
 
   
@@ -408,7 +413,12 @@ Released under the MIT license: http://jsbin.mit-license.org
                 if (data.pw)         document.getElementById('ntrip_pass').value = data.pw;
                 if (data.base_mount) document.getElementById('base_mount').value = data.base_mount;                
             } catch (e) {
-                console.warn("非JSON數據，已自動忽略。");
+                //console.warn("非JSON數據，已自動忽略。");
+                // 若非 JSON，將原始文字顯示在 rtk_log 中
+                const logElem = document.getElementById('rtk_log');
+                if (logElem) {
+                    logElem.textContent = msgString;
+                }
             }
         }      
     });
