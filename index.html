@@ -472,13 +472,13 @@ function sendConfig() {
 }
     
     function loadConfig() {
-        if (workmode !== "idle") {
+        /*if (workmode !== "idle") {
             alert("請先離線再操作！");
         }
         else {
             client.publish(myTopic, "AT+CONFIG?", { qos: 1 });
-        }        
-        
+        }*/ 
+        client.publish(myTopic, "AT+CONFIG?", { qos: 1 });
     }
 
     function loadBase() {
