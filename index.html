@@ -333,6 +333,12 @@ Released under the MIT license: http://jsbin.mit-license.org
         document.getElementById('rtk_log').textContent = "--";
         document.getElementById('rtk_uptime').textContent = "--";
         document.getElementById('rtk_tempC').textContent = "--";
+        const mapLinkElem = document.getElementById('rtk_map_link');
+        if (mapLinkElem) {
+            mapLinkElem.removeAttribute('href');
+            mapLinkElem.style.pointerEvents = "none";
+            mapLinkElem.style.opacity = "0.5";
+        }        
     }
 
     
