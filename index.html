@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <!--
 Created using JS Bin
@@ -82,7 +83,7 @@ Released under the MIT license: http://jsbin.mit-license.org
 <body>
 
 <div class="window">
-    <div class="title-bar">RTK 控制面板 (KY8688E0)</div>
+    <div class="title-bar">RTK 控制面板 (KYD1BD58)</div>
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; white-space: nowrap;">
         <div style="flex: 1; text-align: left;">
             連線狀態: <span id="status">正在連線至 MQTTGO...</span>
@@ -94,6 +95,16 @@ Released under the MIT license: http://jsbin.mit-license.org
             溫度: <span id="rtk_tempC" class="val"></span>
         </div>      
     </div> 
+    <div class="group">
+      
+      <div class="field" style="margin-bottom: 5px;">
+          <label>裝置名稱 ID :</label>
+          <div style="display: flex; width: 100%; gap: 6px;">
+              <input type="text" id="device_id" value="" placeholder="輸入設備ID (例: KY001)">
+              <button onclick="switchDevice()" style="width: 100px; margin-top: 0; padding: 6px 10px; font-size: 14px;">登入</button>
+          </div>
+      </div>
+    </div>
 
     <div class="group">
         <div class="group-title">NMEA即時狀態(5秒更新)</div>
@@ -230,15 +241,24 @@ Released under the MIT license: http://jsbin.mit-license.org
     var ellipsoid = 0.0;
     var geoid = 0.0;
     // ═══════════════ MQTTGO 伺服器與 Topic 設定 ═══════════════
+// ═══════════════ 動態 Topic 與 MQTTGO 設定 ═══════════════
     const host = 'wss://mqttgo.vip:8084/mqtt'; 
-    const myTopic = '/user/rock859985/RTK/KY8688E0/cmd'; // 網頁發佈(傳送)給 ESP32 的主題
-    const reportTopic1 = '/user/rock859985/RTK/KY8688E0/nmea'; // 網頁訂閱(接收) ESP32 狀態的主題
-    const reportTopic2 = '/user/rock859985/RTK/KY8688E0/log'; // 網頁訂閱(接收) ESP32 狀態的主題
+    
+    // 改為動態變數 /user/rock859985/RTK/KY001/cmd
+    let currentDeviceId = localStorage.getItem("rtk_device_id");
+    let myTopic = `/user/rock859985/RTK/${currentDeviceId}/cmd`;
+    let reportTopic1 = `/user/rock859985/RTK/${currentDeviceId}/nmea`; // 原本程式碼有雙斜線 //nmea，此處修正為 /nmea
+    let reportTopic2 = `/user/rock859985/RTK/${currentDeviceId}/log`;
 
-    // MQTT 連線參數設定
+    // 頁面載入時填入已儲存的 ID
+    document.addEventListener("DOMContentLoaded", () => {
+        const devInput = document.getElementById('device_id');
+        if (devInput) devInput.value = currentDeviceId;
+    });
+
     const options = {
         connectTimeout: 4000,
-        clientId: 'KYweb' + Math.random().toString(16).substr(2, 8),
+        clientId: 'KY' + Math.random().toString(16).substr(2, 8),
         username: 'rock859985', 
         password: 'Kb9waBiV9ZV3', 
     };
@@ -249,14 +269,67 @@ Released under the MIT license: http://jsbin.mit-license.org
     client.on('connect', () => {
         document.getElementById('status').innerText = '連線成功';
         document.getElementById('status').style.color = 'green';
-        client.subscribe(reportTopic1);
-        client.subscribe(reportTopic2);
+        
+        // 訂閱當前裝置主題
+        subscribeTopics(currentDeviceId);
     });
 
     client.on('error', (err) => {
         document.getElementById('status').innerText = '連線失敗';
         document.getElementById('status').style.color = 'red';
-    });  
+    });
+
+    // 訂閱函式
+    function subscribeTopics(devId) {
+        myTopic = `/user/rock859985/RTK/${devId}/cmd`;
+        reportTopic1 = `/user/rock859985/RTK/${devId}/nmea`;
+        reportTopic2 = `/user/rock859985/RTK/${devId}/log`;
+
+        client.subscribe(reportTopic1);
+        client.subscribe(reportTopic2);
+        console.log(`已訂閱裝置 [${devId}] 主題`);
+    }
+
+    // 動態切換裝置函式
+    function switchDevice() {
+        const inputVal = document.getElementById('device_id').value.trim();
+        if (!inputVal) {
+            alert("請輸入裝置名稱！");
+            return;
+        }
+
+        if (client.connected) {
+            // 先退訂舊主題，避免多個裝置資料混雜
+            client.unsubscribe(reportTopic1);
+            client.unsubscribe(reportTopic2);
+
+            // 清空當前畫面的舊數據
+            clearDisplayValues();
+
+            // 更新裝置 ID 並訂閱新主題
+            currentDeviceId = inputVal;
+            localStorage.setItem("rtk_device_id", currentDeviceId);
+            subscribeTopics(currentDeviceId);
+            alert(`已切換至裝置：${currentDeviceId}`);
+        } else {
+            alert("MQTT 尚未連線，無法切換！");
+        }
+    }
+
+    // 清空介面舊數據輔助函式
+    function clearDisplayValues() {
+        document.getElementById('rtk_sol').textContent = "--";
+        document.getElementById('rtk_lat').textContent = "--";
+        document.getElementById('rtk_lon').textContent = "--";
+        document.getElementById('rtk_ell').textContent = "--";
+        document.getElementById('rtk_alt').textContent = "--";
+        document.getElementById('rtk_geo').textContent = "--";
+        document.getElementById('rtk_time').textContent = "--";
+        document.getElementById('rtk_log').textContent = "--";
+        document.getElementById('rtk_uptime').textContent = "--";
+        document.getElementById('rtk_tempC').textContent = "--";
+    }
+
     
     client.on('message', (topic, message) => {
         const msgString = message.toString();
