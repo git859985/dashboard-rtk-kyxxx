@@ -83,7 +83,7 @@ Released under the MIT license: http://jsbin.mit-license.org
 <body>
 
 <div class="window">
-    <div class="title-bar">RTK 控制面板 (工程版)</div>
+    <div class="title-bar">康鷹空間資訊 RTK 控制面板 (工程版)</div>
     <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; white-space: nowrap;">
         <div style="flex: 1; text-align: left;">
             連線狀態: <span id="status">正在連線至 MQTTGO...</span>
@@ -98,7 +98,7 @@ Released under the MIT license: http://jsbin.mit-license.org
     <div class="group">
       
       <div class="field" style="margin-bottom: 5px;">
-          <label>裝置名稱 ID :</label>
+          <label>設備 ID :</label>
           <div style="display: flex; width: 100%; gap: 6px;">
               <input type="text" id="device_id" value="" placeholder="輸入設備ID (例: KY001)">
               <button onclick="switchDevice()" style="width: 100px; margin-top: 0; padding: 6px 10px; font-size: 14px;">登入</button>
@@ -114,11 +114,17 @@ Released under the MIT license: http://jsbin.mit-license.org
         </div>
         <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
             <label style="margin-bottom: 0;">緯度 (Lat):</label>
-            <span id="rtk_lat" class="val" style="width: auto; text-align: right;"></span>
+            <span id="rtk_lat" class="val" style="width: auto; text-align: right;">--</span>
         </div>
         <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
             <label style="margin-bottom: 0;">經度 (Lon):</label>
-            <span id="rtk_lon" class="val" style="width: auto; text-align: right;"></span>
+            <span id="rtk_lon" class="val" style="width: auto; text-align: right;">--</span>
+        </div>
+        <!-- 新增：點擊開啟 Google 地圖按鈕/連結 -->
+        <div class="field" style="flex-direction: row; justify-content: flex-end; margin-bottom: 5px;">
+            <a id="rtk_map_link" href="javascript:void(0);" target="_blank" style="font-size: 13px; color: blue; text-decoration: underline; pointer-events: none; opacity: 0.5;">
+                在 Google 地圖中開啟位置
+            </a>
         </div>
         <div class="field" style="flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 5px;">
             <label style="margin-bottom: 0;">橢球高 (Ellipsoid):</label>
@@ -240,14 +246,13 @@ Released under the MIT license: http://jsbin.mit-license.org
     var lonDMS = "";
     var ellipsoid = 0.0;
     var geoid = 0.0;
-    // ═══════════════ MQTTGO 伺服器與 Topic 設定 ═══════════════
-// ═══════════════ 動態 Topic 與 MQTTGO 設定 ═══════════════
+    // ═══════════════ 動態 Topic 與 MQTTGO 設定 ═══════════════
     const host = 'wss://mqttgo.vip:8084/mqtt'; 
     
     // 改為動態變數 /user/rock859985/RTK/KY001/cmd
     let currentDeviceId = localStorage.getItem("rtk_device_id");
     let myTopic = `/user/rock859985/RTK/${currentDeviceId}/cmd`;
-    let reportTopic1 = `/user/rock859985/RTK/${currentDeviceId}/nmea`; // 原本程式碼有雙斜線 //nmea，此處修正為 /nmea
+    let reportTopic1 = `/user/rock859985/RTK/${currentDeviceId}/nmea`; 
     let reportTopic2 = `/user/rock859985/RTK/${currentDeviceId}/log`;
 
     // 頁面載入時填入已儲存的 ID
@@ -310,9 +315,9 @@ Released under the MIT license: http://jsbin.mit-license.org
             currentDeviceId = inputVal;
             localStorage.setItem("rtk_device_id", currentDeviceId);
             subscribeTopics(currentDeviceId);
-            alert(`已切換至裝置：${currentDeviceId}`);
+            //alert(`已切換至裝置：${currentDeviceId}`);
         } else {
-            alert("MQTT 尚未連線，無法切換！");
+            alert("MQTT 尚未連線，無法登入！");
         }
     }
 
@@ -394,7 +399,21 @@ Released under the MIT license: http://jsbin.mit-license.org
                     document.getElementById('rtk_lon').textContent = lonDD + " / " + lonDMS;              
                 } else {
                     document.getElementById('rtk_lon').textContent = "--";
-                }           
+                }
+
+                // ═══════════════ 更新 Google Maps 連結 ═══════════════
+                const mapLinkElem = document.getElementById('rtk_map_link');
+                if (mapLinkElem) {
+                    if (data.RawLat && data.RawLon && latDD > 0 && lonDD > 0) {
+                        mapLinkElem.href = `https://www.google.com/maps/search/?api=1&query=${latDD},${lonDD}`;
+                        mapLinkElem.style.pointerEvents = "auto"; // 恢復可點擊
+                        mapLinkElem.style.opacity = "1";
+                    } else {
+                        mapLinkElem.removeAttribute('href');
+                        mapLinkElem.style.pointerEvents = "none"; // 無座標時禁用點擊
+                        mapLinkElem.style.opacity = "0.5";
+                    }
+                }          
                           
                 // 3. 【高能注意】海拔高度可能是 0 米！用簡寫會失效，所以必須用這種寫法來防呆：
                 if (data.Ellipsoid !== undefined && data.Ellipsoid !== null) {
